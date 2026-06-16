@@ -730,21 +730,21 @@ export default function ChatLayout({ user }) {
                   </div>
                 </div>
               )}
-              <div className="flex items-center gap-2 max-w-4xl mx-auto">
+              <div className="flex items-center gap-2 w-full max-w-4xl mx-auto">
                 <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                 <button onClick={() => fileInputRef.current.click()} className="p-2 text-telegram-muted hover:text-white transition-colors">
                   <Paperclip className="w-6 h-6" />
                 </button>
-                <div className="flex-1 bg-telegram-sidebar rounded-xl flex items-center pr-2">
-                  <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-1.5 sm:p-3 text-telegram-muted hover:text-white"><Smile className="w-6 h-6" /></button>
-                  <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} className="p-1.5 sm:p-3 text-telegram-muted hover:text-white"><ImageIcon className="w-5 h-5" /></button>
+                <div className="flex-1 bg-telegram-sidebar rounded-xl flex items-center pr-2 overflow-hidden">
+                  <button onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); }} className="p-1.5 sm:p-3 text-telegram-muted hover:text-white shrink-0"><Smile className="w-6 h-6" /></button>
+                  <button onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); }} className="p-1.5 sm:p-3 text-telegram-muted hover:text-white shrink-0"><ImageIcon className="w-5 h-5" /></button>
                   <input 
                     type="text" 
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder="Message..."
-                    className="flex-1 bg-transparent text-white outline-none py-3"
+                    className="flex-1 min-w-0 w-full bg-transparent text-white outline-none py-3"
                   />
                   {message.length === 0 && (
                     <button 
