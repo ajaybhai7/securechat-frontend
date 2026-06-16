@@ -59,6 +59,7 @@ export default function ChatLayout({ user }) {
 
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const localStreamRef = useRef(null);
 
@@ -268,6 +269,9 @@ export default function ChatLayout({ user }) {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = event.streams[0];
         }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
       };
 
       const offer = await pc.createOffer();
@@ -311,6 +315,9 @@ export default function ChatLayout({ user }) {
       pc.ontrack = (event) => {
         if (remoteVideoRef.current) {
           remoteVideoRef.current.srcObject = event.streams[0];
+        }
+        if (remoteAudioRef.current) {
+          remoteAudioRef.current.srcObject = event.streams[0];
         }
       };
 
@@ -458,7 +465,9 @@ export default function ChatLayout({ user }) {
   };
 
   // --- VOICE RECORDING ---
-  const startRecording = async () => {
+  const startRecording = async (e) => {
+    if (e) e.preventDefault();
+    if (isRecording) return;
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
@@ -469,7 +478,7 @@ export default function ChatLayout({ user }) {
       };
 
       mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current);
         const loadingToast = toast.loading("Sending voice note...");
         
         try {
@@ -511,7 +520,8 @@ export default function ChatLayout({ user }) {
     } catch(err) { console.error("Mic access denied", err); }
   };
 
-  const stopRecording = () => {
+  const stopRecording = (e) => {
+    if (e) e.preventDefault();
     if (mediaRecorderRef.current && isRecording) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
@@ -580,8 +590,7 @@ export default function ChatLayout({ user }) {
   };
 
   return (
-    <div className="flex h-dvh bg-telegram-bg text-telegram-text font-sans overflow-hidden relative">
-      
+    <div className="flex w-full h-dvh bg-telegram-bg text-telegram-text font-sans overflow-hidden relative">
       {/* Sidebar */}
       <div className={`${isMobileChatOpen ? 'hidden md:flex' : 'flex'} w-full md:w-80 bg-telegram-sidebar border-r border-telegram-bg flex-col z-20`}>
         <div className="p-4 flex items-center justify-between border-b border-telegram-bg/50">
@@ -875,6 +884,7 @@ export default function ChatLayout({ user }) {
       {/* WEBRTC CALL INTERFACE OVERLAY */}
       {callState !== 'idle' && (
         <div className="absolute inset-0 bg-telegram-bg/95 z-[100] flex flex-col items-center justify-between p-6 text-white overflow-y-auto">
+          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
           
           {/* Call Header */}
           <div className="text-center mt-12">
