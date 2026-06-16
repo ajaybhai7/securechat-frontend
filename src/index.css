@@ -1,0 +1,21 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-telegram-bg text-white m-0 p-0 font-sans;
+  }
+}
+
+/* Custom Scrollbar for Telegram-like feel */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: #475569;
+  border-radius: 10px;
+}
