@@ -456,11 +456,11 @@ export default function ChatLayout({ user }) {
     const chatKey = activeChat.isGroup ? activeChat.id : activeChat.username;
     socket.emit('send_message', {
       sender: user.username, receiver: chatKey, 
-      encryptedContent: gifUrl, isFile: true, fileName: 'gif_image', isGroup: activeChat.isGroup 
+      encryptedContent: gifUrl, isFile: true, fileName: 'image.gif', isGroup: activeChat.isGroup 
     });
     setMessages(prev => ({
       ...prev,
-      [chatKey]: [...(prev[chatKey] || []), { text: gifUrl, fromMe: true, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), isFile: true, fileName: 'gif_image' }]
+      [chatKey]: [...(prev[chatKey] || []), { text: gifUrl, fromMe: true, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), isFile: true, fileName: 'image.gif' }]
     }));
   };
 
