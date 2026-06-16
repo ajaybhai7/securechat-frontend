@@ -77,6 +77,7 @@ export default function ChatLayout({ user }) {
   const remoteVideoRef = useRef(null);
   const remoteAudioRef = useRef(null);
   const peerConnectionRef = useRef(null);
+  const pendingIceCandidatesRef = useRef([]);
   const localStreamRef = useRef(null);
 
   // Emojis & GIFs
@@ -193,6 +194,12 @@ export default function ChatLayout({ user }) {
         try {
           await peerConnectionRef.current.setRemoteDescription(new RTCSessionDescription(signal));
           setCallState('connected');
+          
+          pendingIceCandidatesRef.current.forEach(async (candidate) => {
+             try { await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(candidate)); } 
+             catch(e) { console.error("Error adding queued ice candidate (A):", e); }
+          });
+          pendingIceCandidatesRef.current = [];
         } catch (err) {
           console.error("Failed to set remote description on call accepted:", err);
         }
@@ -200,12 +207,14 @@ export default function ChatLayout({ user }) {
     });
 
     newSocket.on('ice_candidate', async (data) => {
-      if (peerConnectionRef.current) {
+      if (peerConnectionRef.current && peerConnectionRef.current.remoteDescription) {
         try {
           await peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(data.candidate));
         } catch (err) {
           console.error("Error adding ice candidate:", err);
         }
+      } else {
+        pendingIceCandidatesRef.current.push(data.candidate);
       }
     });
 
@@ -355,6 +364,13 @@ export default function ChatLayout({ user }) {
       };
 
       await pc.setRemoteDescription(new RTCSessionDescription(callIncoming.signal));
+      
+      pendingIceCandidatesRef.current.forEach(async (candidate) => {
+         try { await pc.addIceCandidate(new RTCIceCandidate(candidate)); } 
+         catch(e) { console.error("Error adding queued ice candidate (B):", e); }
+      });
+      pendingIceCandidatesRef.current = [];
+
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
@@ -392,10 +408,22 @@ export default function ChatLayout({ user }) {
       peerConnectionRef.current.close();
       peerConnectionRef.current = null;
     }
+    pendingIceCandidatesRef.current = [];
     setCallState('idle');
     setActiveCallUser(null);
     setCallIncoming(null);
   };
+
+  // Auto-hangup if peer goes offline
+  useEffect(() => {
+    if (callState !== 'idle' && activeCallUser) {
+      const peer = users.find(u => u.username === activeCallUser);
+      if (peer && !peer.online) {
+        toast.error(`${activeCallUser} went offline. Call ended.`);
+        endCallLocally();
+      }
+    }
+  }, [users, callState, activeCallUser]);
 
   const toggleMute = () => {
     if (localStreamRef.current) {
