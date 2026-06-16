@@ -21,6 +21,8 @@ const isVideoFile = (fileName) => {
   return ['mp4', 'webm', 'ogg', 'mov'].includes(ext);
 };
 
+const generateId = () => Date.now().toString(36) + Math.random().toString(36).substr(2);
+
 export default function ChatLayout({ user }) {
   const [socket, setSocket] = useState(null);
   const [users, setUsers] = useState([]);
@@ -38,6 +40,13 @@ export default function ChatLayout({ user }) {
 
   // Mobile View State
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
+
+  // Message Interaction States
+  const [replyingTo, setReplyingTo] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [contextMenu, setContextMenu] = useState(null); // { message, x, y }
+
 
   // UI States
   const [showProfile, setShowProfile] = useState(false);
@@ -127,18 +136,31 @@ export default function ChatLayout({ user }) {
         }
         
         const chatKey = data.isGroup ? data.receiver : (data.sender === user.username ? data.receiver : data.sender);
-        setMessages(prev => ({
-          ...prev,
-          [chatKey]: [...(prev[chatKey] || []), { 
-            text: finalDecryptedText, 
-            fromMe: data.sender === user.username, 
-            senderName: data.sender, 
-            time: new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
-            isFile: data.isFile, 
-            fileName: data.fileName, 
-            isAudio: data.isAudio 
-          }]
-        }));
+        
+        setMessages(prev => {
+          const chatMsgs = prev[chatKey] || [];
+          if (data.isEdit) {
+             return { ...prev, [chatKey]: chatMsgs.map(m => m.id === data.targetId ? { ...m, text: finalDecryptedText, isEdited: true } : m) };
+          }
+          if (data.isDelete) {
+             return { ...prev, [chatKey]: chatMsgs.map(m => m.id === data.targetId ? { ...m, isDeleted: true, text: '🚫 This message was deleted', isFile: false, isAudio: false } : m) };
+          }
+          return {
+            ...prev,
+            [chatKey]: [...chatMsgs, { 
+              id: data.id || generateId(),
+              text: finalDecryptedText, 
+              fromMe: data.sender === user.username, 
+              senderName: data.sender, 
+              time: new Date(data.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), 
+              isFile: data.isFile, 
+              fileName: data.fileName, 
+              isAudio: data.isAudio,
+              replyTo: data.replyTo,
+              isForwarded: data.isForwarded
+            }]
+          };
+        });
 
         // Notifications
         const currentChatKey = activeChatRef.current ? (activeChatRef.current.isGroup ? activeChatRef.current.id : activeChatRef.current.username) : null;
@@ -355,6 +377,8 @@ export default function ChatLayout({ user }) {
   const hangUp = () => {
     if (activeCallUser && socket) {
       socket.emit('end_call', { to: activeCallUser });
+    } else if (callIncoming && callIncoming.from && socket) {
+      socket.emit('end_call', { to: callIncoming.from });
     }
     endCallLocally();
   };
@@ -389,6 +413,60 @@ export default function ChatLayout({ user }) {
     }
   };
 
+  // --- GESTURES ---
+  const handleTouchStart = (e, msg) => {
+    const target = e.currentTarget;
+    target.dataset.startX = e.touches[0].clientX;
+    target.dataset.currentX = 0;
+    target.style.transition = 'none';
+    
+    target.longPressTimer = setTimeout(() => {
+      setContextMenu({ msg, x: e.touches[0].clientX, y: e.touches[0].clientY });
+      target.dataset.startX = null; 
+    }, 500);
+  };
+  const handleTouchMove = (e) => {
+    const target = e.currentTarget;
+    if (target.longPressTimer) clearTimeout(target.longPressTimer);
+    if (!target.dataset.startX) return;
+
+    let diffX = e.touches[0].clientX - parseFloat(target.dataset.startX);
+    if (diffX < 0) diffX = 0; // only swipe right to reply
+    if (diffX > 60) diffX = 60 + (diffX - 60) * 0.2; // resistance
+
+    target.style.transform = `translateX(${diffX}px)`;
+    target.dataset.currentX = diffX;
+  };
+  const handleTouchEnd = (e, msg) => {
+    const target = e.currentTarget;
+    if (target.longPressTimer) clearTimeout(target.longPressTimer);
+    target.style.transition = 'transform 0.2s ease-out';
+    target.style.transform = 'translateX(0px)';
+    if (target.dataset.currentX > 50) {
+      setReplyingTo(msg);
+    }
+    target.dataset.startX = null;
+    target.dataset.currentX = 0;
+  };
+
+  const handleContextMenu = (e, msg) => {
+    e.preventDefault();
+    setContextMenu({ msg, x: e.clientX, y: e.clientY });
+  };
+
+  const handleDeleteMessage = (msgId) => {
+    const chatKey = activeChat.isGroup ? activeChat.id : activeChat.username;
+    socket.emit('send_message', {
+       sender: user.username, receiver: chatKey,
+       isDelete: true, targetId: msgId, isGroup: activeChat.isGroup
+    });
+    setMessages(prev => {
+       const chatMsgs = prev[chatKey] || [];
+       return { ...prev, [chatKey]: chatMsgs.map(m => m.id === msgId ? { ...m, isDeleted: true, text: '🚫 This message was deleted', isFile: false, isAudio: false } : m) };
+    });
+    setContextMenu(null);
+  };
+
   // --- MESSAGING ---
   const handleSendMessage = async () => {
     if (!message || !activeChat || !socket) return;
@@ -407,19 +485,40 @@ export default function ChatLayout({ user }) {
       }
       
       const chatKey = activeChat.isGroup ? activeChat.id : activeChat.username;
+      
+      if (editingMessage) {
+         socket.emit('send_message', {
+           sender: user.username, receiver: chatKey,
+           encryptedContent, encryptedContentSender, isGroup: activeChat.isGroup,
+           isEdit: true, targetId: editingMessage.id
+         });
+         setMessages(prev => {
+           const chatMsgs = prev[chatKey] || [];
+           return { ...prev, [chatKey]: chatMsgs.map(m => m.id === editingMessage.id ? { ...m, text: message, isEdited: true } : m) };
+         });
+         setEditingMessage(null);
+         setMessage('');
+         return;
+      }
+
+      const msgId = generateId();
+      
       socket.emit('send_message', { 
+        id: msgId,
         sender: user.username, 
         receiver: chatKey, 
         encryptedContent, 
         encryptedContentSender, 
-        isGroup: activeChat.isGroup 
+        isGroup: activeChat.isGroup,
+        replyTo: replyingTo ? replyingTo : null
       });
       
       setMessages(prev => ({
         ...prev,
-        [chatKey]: [...(prev[chatKey] || []), { text: message, fromMe: true, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) }]
+        [chatKey]: [...(prev[chatKey] || []), { id: msgId, text: message, fromMe: true, time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), replyTo: replyingTo }]
       }));
       setMessage('');
+      setReplyingTo(null);
     } catch(err) { console.error("Encryption failed", err); }
   };
 
@@ -895,7 +994,7 @@ export default function ChatLayout({ user }) {
       {/* WEBRTC CALL INTERFACE OVERLAY */}
       {callState !== 'idle' && (
         <div className="absolute inset-0 bg-telegram-bg/95 z-[100] flex flex-col items-center justify-between p-6 text-white overflow-y-auto">
-          <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+          <audio ref={remoteAudioRef} autoPlay playsInline style={{ position: 'absolute', width: 0, height: 0, opacity: 0 }} />
           
           {/* Call Header */}
           <div className="text-center mt-12">
