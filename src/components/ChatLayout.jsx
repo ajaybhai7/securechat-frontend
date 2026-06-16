@@ -284,6 +284,10 @@ export default function ChatLayout({ user }) {
     setIsVideoMuted(false);
     setIsMuted(false);
 
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.play().catch(() => {}); // Unlock audio on mobile
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: isVideo });
       localStreamRef.current = stream;
@@ -321,6 +325,13 @@ export default function ChatLayout({ user }) {
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          console.log("ICE Connection failed/disconnected");
+          hangUp();
+        }
+      };
+
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
@@ -339,6 +350,10 @@ export default function ChatLayout({ user }) {
     setIsVideoCall(callIncoming.isVideo);
     setIsVideoMuted(false);
     setIsMuted(false);
+
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.play().catch(() => {}); // Unlock audio on mobile
+    }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: callIncoming.isVideo });
@@ -374,6 +389,13 @@ export default function ChatLayout({ user }) {
         if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
           remoteAudioRef.current.play().catch(e => console.log("Audio play error", e));
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'disconnected' || pc.iceConnectionState === 'failed') {
+          console.log("ICE Connection failed/disconnected");
+          hangUp();
         }
       };
 
