@@ -27,7 +27,14 @@ export default function ChatLayout({ user }) {
   const [groups, setGroups] = useState([]);
   const [activeChat, setActiveChat] = useState(null); 
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState({}); 
+  const [messages, setMessages] = useState(() => {
+    const saved = localStorage.getItem(`chat_history_${user.username}`);
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`chat_history_${user.username}`, JSON.stringify(messages));
+  }, [messages, user.username]); 
 
   // Mobile View State
   const [isMobileChatOpen, setIsMobileChatOpen] = useState(false);
