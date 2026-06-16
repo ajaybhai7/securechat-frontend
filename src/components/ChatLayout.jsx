@@ -266,11 +266,13 @@ export default function ChatLayout({ user }) {
       };
 
       pc.ontrack = (event) => {
-        if (remoteVideoRef.current) {
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
           remoteVideoRef.current.srcObject = event.streams[0];
+          remoteVideoRef.current.play().catch(e => console.log("Video play error", e));
         }
-        if (remoteAudioRef.current) {
+        if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
+          remoteAudioRef.current.play().catch(e => console.log("Audio play error", e));
         }
       };
 
@@ -313,11 +315,13 @@ export default function ChatLayout({ user }) {
       };
 
       pc.ontrack = (event) => {
-        if (remoteVideoRef.current) {
+        if (remoteVideoRef.current && remoteVideoRef.current.srcObject !== event.streams[0]) {
           remoteVideoRef.current.srcObject = event.streams[0];
+          remoteVideoRef.current.play().catch(e => console.log("Video play error", e));
         }
-        if (remoteAudioRef.current) {
+        if (remoteAudioRef.current && remoteAudioRef.current.srcObject !== event.streams[0]) {
           remoteAudioRef.current.srcObject = event.streams[0];
+          remoteAudioRef.current.play().catch(e => console.log("Audio play error", e));
         }
       };
 
@@ -673,14 +677,14 @@ export default function ChatLayout({ user }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-4" style={{backgroundImage: "url('https://web.telegram.org/a/chat-bg-pattern-dark.png')", backgroundSize: '400px', opacity: 0.9}}>
               {(messages[activeChat.isGroup ? activeChat.id : activeChat.username] || []).map((msg, idx) => (
                 <div key={idx} className={`flex ${msg.fromMe ? 'justify-end' : ''}`}>
-                  <div className={`max-w-md p-3 shadow-sm ${msg.fromMe ? 'bg-telegram-messageOut rounded-2xl rounded-br-none text-white' : 'bg-telegram-messageIn rounded-2xl rounded-bl-none'}`}>
+                  <div className={`max-w-md shadow-sm ${msg.fromMe ? 'bg-telegram-messageOut rounded-2xl rounded-br-none text-white' : 'bg-telegram-messageIn rounded-2xl rounded-bl-none'} ${(msg.isFile && (msg.text.startsWith('data:image') || isImageFile(msg.fileName))) ? 'p-1 bg-transparent border-none' : 'p-3'}`}>
                     
                     {activeChat.isGroup && !msg.fromMe && <p className="text-xs text-telegram-primary font-bold mb-1">{msg.senderName}</p>}
 
                     {msg.isAudio ? (
                        <audio src={msg.text} controls className="h-10 w-48" />
                     ) : msg.isFile && (msg.text.startsWith('data:image') || isImageFile(msg.fileName)) ? (
-                       <img src={msg.text} alt={msg.fileName} className="max-w-[250px] md:max-w-[350px] rounded-lg mb-2" />
+                       <img src={msg.text} alt={msg.fileName} className="max-w-[200px] md:max-w-[300px] object-cover rounded-xl shadow-md border border-white/10" />
                     ) : msg.isFile && isVideoFile(msg.fileName) ? (
                        <video src={msg.text} controls className="max-w-[250px] md:max-w-[350px] rounded-lg mb-2" />
                     ) : msg.isFile ? (
